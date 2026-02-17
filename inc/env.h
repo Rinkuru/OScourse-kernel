@@ -82,6 +82,18 @@ struct Env {
     uint32_t env_ipc_value;  /* Data value sent to us */
     envid_t env_ipc_from;    /* envid of the sender */
     int env_ipc_perm;        /* Perm of page mapping received */
+
+    /* itask */
+    bool env_is_rt;                   // Флаг: процесс реального времени?
+    uint64_t env_rt_period;            // Период (в микросекундах или тиках)
+    uint64_t env_rt_deadline;          // Относительный deadline от начала периода
+    uint64_t env_rt_wcet;              // Worst-Case Execution Time (оценка сверху)
+    
+    uint64_t env_rt_next_period;       // Абсолютное время начала следующего периода
+    uint64_t env_rt_absolute_deadline; // Абсолютный deadline текущего периода
+    uint64_t env_rt_exec_time;         // Время выполнения в текущем периоде
+    
+    void (*env_rt_deadline_handler)(void); // Обработчик нарушения deadline
 };
 
 #endif /* !JOS_INC_ENV_H */

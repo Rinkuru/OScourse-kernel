@@ -46,5 +46,8 @@ uint64_t tsc_calibrate(void);
 void timer_start(const char *name);
 void timer_stop(void);
 void timer_cpu_frequency(const char *name);
+/* itask: Time functions for real-time scheduler */
+uint64_t get_current_time_us(void);
+uint64_t get_tsc_freq_hz(void);
 
 #endif /* !JOS_KERN_TSC_H */

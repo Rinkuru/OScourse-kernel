@@ -20,6 +20,10 @@ enum {
     SYS_ipc_try_send,
     SYS_ipc_recv,
     SYS_gettime,
+    /* itask */
+    SYS_rt_register,      // Регистрация RT‑процесса
+    SYS_rt_periodic_wait, // Ожидание следующего периода
+    SYS_rt_unregister,    // Снятие RT‑статуса (опционально)
     NSYSCALLS
 };
 

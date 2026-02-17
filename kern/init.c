@@ -136,6 +136,14 @@ i386_init(void) {
 
     tsc_calibrate();
 
+    /* itask: Print TSC frequency info for RT scheduler */
+    if (trace_init) {
+        cprintf("6828 decimal is %o octal!\n", 6828);
+        cprintf("END: %p\n", end);
+        cprintf("[TSC] Frequency: %lu Hz (%lu MHz)\n", 
+                get_tsc_freq_hz(), get_tsc_freq_hz() / 1000000);
+    }
+
     if (trace_init) {
         cprintf("6828 decimal is %o octal!\n", 6828);
         cprintf("END: %p\n", end);

@@ -3,6 +3,7 @@
 #include <inc/x86.h>
 #include <inc/stdio.h>
 #include <inc/string.h>
+#include <inc/assert.h>
 
 #include <kern/tsc.h>
 #include <kern/timer.h>
@@ -11,6 +12,10 @@
 #define PIT_TICK_RATE 1193182ul
 #define DEFAULT_FREQ  2500000
 #define TIMES         100
+
+/* itask: Global TSC frequency for real-time scheduler.
+ * Initialized by tsc_calibrate() during boot. */
+static uint64_t tsc_freq_hz = 0;  // TSC frequency in Hz (ticks per second)
 
 struct Timer timer_pit = {
         .timer_name = "pit",
@@ -175,6 +180,9 @@ tsc_calibrate(void) {
         }
     }
 
+    /* itask: Save TSC frequency for RT scheduler use */
+    tsc_freq_hz = cpu_freq * 1000;  // cpu_freq is in kHz, convert to Hz
+
     return cpu_freq * 1000;
 }
 
@@ -244,3 +252,47 @@ timer_cpu_frequency(const char *name) {
     }
     print_timer_error();
 }
+
+/* ========== itask: TSC-based time functions for RT scheduler ========== */
+
+/* Get current time in microseconds since boot.
+ * Used by real-time scheduler for deadline tracking.
+ * 
+ * Returns: Time in microseconds (10^-6 seconds)
+ * 
+ * NOTE: This function assumes tsc_calibrate() has been called during boot.
+ */
+uint64_t
+get_current_time_us(void) {
+    if (tsc_freq_hz == 0) {
+        /* TSC not calibrated yet - should not happen after boot */
+        panic("get_current_time_us: TSC not calibrated!");
+    }
+    
+    uint64_t tsc_ticks = read_tsc();
+    
+    /* Convert TSC ticks to microseconds:
+     * microseconds = (tsc_ticks * 1000000) / tsc_freq_hz
+     * 
+     * To avoid overflow, we can rearrange:
+     * microseconds = tsc_ticks / (tsc_freq_hz / 1000000)
+     */
+    uint64_t tsc_freq_mhz = tsc_freq_hz / 1000000;  // Convert Hz to MHz
+    
+    if (tsc_freq_mhz == 0) {
+        /* Very slow CPU (< 1 MHz) - should never happen */
+        tsc_freq_mhz = 1;
+    }
+    
+    return tsc_ticks / tsc_freq_mhz;
+}
+
+/* Get TSC frequency in Hz (for debugging/info).
+ * Returns: TSC frequency in ticks per second
+ */
+uint64_t
+get_tsc_freq_hz(void) {
+    return tsc_freq_hz;
+}
+
+/* ========== End of itask TSC functions ========== */

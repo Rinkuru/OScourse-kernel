@@ -211,6 +211,16 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, enum EnvType type) {
     /* Also clear the IPC receiving flag. */
     env->env_ipc_recving = 0;
 
+    /* itask: Initialize RT fields to default (non-RT) state */
+    env->env_is_rt = false;
+    env->env_rt_period = 0;
+    env->env_rt_deadline = 0;
+    env->env_rt_wcet = 0;
+    env->env_rt_next_period = 0;
+    env->env_rt_absolute_deadline = 0;
+    env->env_rt_exec_time = 0;
+    env->env_rt_deadline_handler = NULL;
+
     /* Commit the allocation */
     env_free_list = env->env_link;
     *newenv_store = env;

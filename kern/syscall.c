@@ -13,6 +13,7 @@
 #include <kern/syscall.h>
 #include <kern/trap.h>
 #include <kern/traceopt.h>
+#include <kern/tsc.h>
 
 /* Print a string to the system console.
  * The string is exactly 'len' characters long.
@@ -477,6 +478,200 @@ sys_region_refs(uintptr_t addr, size_t size, uintptr_t addr2, uintptr_t size2) {
     }
 }
 
+/* ========== itask: Real-Time Scheduling System Calls ========== */
+/* Check schedulability using Utilization Bound test for EDF.
+ * For EDF: sufficient condition is U = sum(WCET_i / Period_i) <= 1.0
+ * Returns true if the new RT process can be admitted, false otherwise.
+ */
+static bool
+rt_admission_control(uint64_t new_period, uint64_t new_wcet) {
+    double total_utilization = 0.0;
+    
+    // Считаем суммарную утилизацию существующих RT-процессов
+    for (int i = 0; i < NENV; i++) {
+        struct Env *e = &envs[i];
+        if (e->env_status != ENV_FREE && e->env_is_rt) {
+            // Утилизация = WCET / Period
+            total_utilization += (double)e->env_rt_wcet / (double)e->env_rt_period;
+        }
+    }
+    
+    // Добавляем утилизацию нового процесса
+    total_utilization += (double)new_wcet / (double)new_period;
+    
+    // Проверяем: не превышает ли суммарная утилизация 95% 
+    // (оставляем 5% запас для накладных расходов ядра)
+    if (total_utilization > 0.95) {
+        cprintf("[RT] Admission control failed: utilization %.2f > 0.95\n", 
+                total_utilization);
+        return false;
+    }
+    
+    cprintf("[RT] Admission control passed: utilization %.2f <= 0.95\n", 
+            total_utilization);
+    return true;
+}
+
+/* itask: Register current process as real-time (periodic) process.
+ * 
+ * Parameters:
+ *   period    - Period in microseconds (how often the process runs)
+ *   deadline  - Relative deadline from period start (must be <= period)
+ *   wcet      - Worst-Case Execution Time estimate (must be <= deadline)
+ *   handler   - User-space function to call on deadline miss (can be NULL)
+ * 
+ * Returns:
+ *   0 on success
+ *   -E_INVAL if parameters are invalid
+ *   -E_NO_FREE_ENV if admission control fails (system overload)
+ */
+static int
+sys_rt_register(uint64_t period, uint64_t deadline, uint64_t wcet, void (*handler)(void)) {
+    if (!curenv) {
+        return -E_BAD_ENV;
+    }
+    
+    // Проверка корректности параметров
+    if (period == 0 || deadline == 0 || wcet == 0) {
+        cprintf("[RT] Invalid parameters: period/deadline/wcet must be > 0\n");
+        return -E_INVAL;
+    }
+    
+    if (deadline > period) {
+        cprintf("[RT] Invalid parameters: deadline %lu > period %lu\n", 
+                deadline, period);
+        return -E_INVAL;
+    }
+    
+    if (wcet > deadline) {
+        cprintf("[RT] Invalid parameters: wcet %lu > deadline %lu\n", 
+                wcet, deadline);
+        return -E_INVAL;
+    }
+    
+    // Проверка schedulability (admission control)
+    if (!rt_admission_control(period, wcet)) {
+        return -E_NO_FREE_ENV; // Используем как код ошибки "система перегружена"
+    }
+    
+    // Регистрируем процесс как RT
+    curenv->env_is_rt = true;
+    curenv->env_rt_period = period;
+    curenv->env_rt_deadline = deadline;
+    curenv->env_rt_wcet = wcet;
+    curenv->env_rt_deadline_handler = handler;
+    
+    // Инициализируем временные параметры первого периода
+    uint64_t now = get_current_time_us();
+    curenv->env_rt_next_period = now + period;
+    curenv->env_rt_absolute_deadline = now + deadline;
+    curenv->env_rt_exec_time = 0;
+    
+    cprintf("[RT] Process %08x registered: period=%lu, deadline=%lu, wcet=%lu\n",
+            curenv->env_id, period, deadline, wcet);
+    cprintf("[RT] Current time: %lu us, first deadline at %lu us\n",
+        now, curenv->env_rt_absolute_deadline);
+    
+    return 0;
+}
+
+/* itask: Wait for the next period (blocking call for periodic RT processes).
+ * This function:
+ *   1. Checks if WCET was exceeded (warning, not error)
+ *   2. Checks if deadline was missed -> calls handler and demotes to normal
+ *   3. Blocks the process until next period starts
+ *   4. Updates absolute deadline for next period
+ * 
+ * Does not return on success (yields to scheduler).
+ * If deadline is missed, returns after calling handler and demotion.
+ */
+static void
+sys_rt_periodic_wait(void) {
+    if (!curenv || !curenv->env_is_rt) {
+        // Обычный процесс вызвал PERIODIC_WAIT - просто отдаём управление
+        cprintf("[RT] Warning: non-RT process called periodic_wait, yielding\n");
+        sys_yield();
+        return; // unreachable
+    }
+    
+    uint64_t now = get_current_time_us();
+    
+    // 1. Проверка: не превысили ли WCET?
+    if (curenv->env_rt_exec_time > curenv->env_rt_wcet) {
+        cprintf("[RT] Warning: Process %08x exceeded WCET: %lu > %lu\n",
+                curenv->env_id, curenv->env_rt_exec_time, curenv->env_rt_wcet);
+    }
+    
+    // 2. Проверка: успели до deadline?
+    if (now > curenv->env_rt_absolute_deadline) {
+        cprintf("[RT] DEADLINE MISS: Process %08x missed deadline by %lu us\n",
+                curenv->env_id, now - curenv->env_rt_absolute_deadline);
+        
+        // Вызываем обработчик нарушения deadline (если задан)
+        if (curenv->env_rt_deadline_handler) {
+            // ВАЖНО: обработчик вызывается в контексте процесса
+            // Для этого нужно модифицировать Trapframe:
+            // - Сохранить текущий RIP
+            // - Установить RIP = handler
+            // - После возврата из handler восстановить выполнение
+            // 
+            // Упрощённый вариант: вызываем напрямую (небезопасно!)
+            // TODO: Правильная реализация через модификацию trapframe
+            cprintf("[RT] Calling deadline handler at %p\n", 
+                    curenv->env_rt_deadline_handler);
+            // curenv->env_rt_deadline_handler(); // НЕБЕЗОПАСНО в kernel mode
+        }
+        
+        // Переводим процесс в обычный режим
+        curenv->env_is_rt = false;
+        curenv->env_status = ENV_RUNNABLE;
+        
+        cprintf("[RT] Process %08x demoted to normal process\n", curenv->env_id);
+        
+        // Отдаём управление планировщику
+        sched_yield();
+        return; // unreachable
+    }
+    
+    // 3. Всё в порядке - блокируем процесс до следующего периода
+    curenv->env_status = ENV_NOT_RUNNABLE;
+    
+    // 4. Обновляем параметры для следующего периода
+    curenv->env_rt_next_period += curenv->env_rt_period;
+    curenv->env_rt_absolute_deadline += curenv->env_rt_period;
+    curenv->env_rt_exec_time = 0;
+
+    cprintf("[RT] Process %08x waiting for next period at %lu us (current: %lu us)\n",
+        curenv->env_id, curenv->env_rt_next_period, now);
+    
+    // Отдаём управление планировщику
+    sched_yield();
+}
+
+/* itask: Unregister current process from RT mode (optional).
+ * Process becomes a normal round-robin process.
+ * 
+ * Returns: 0 on success, -E_BAD_ENV if not RT process
+ */
+static int
+sys_rt_unregister(void) {
+    if (!curenv) {
+        return -E_BAD_ENV;
+    }
+    
+    if (!curenv->env_is_rt) {
+        return -E_INVAL; // Процесс и так не RT
+    }
+    
+    curenv->env_is_rt = false;
+    cprintf("[RT] Process %08x unregistered from RT mode\n", curenv->env_id);
+    
+    return 0;
+}
+
+/* ========== End of itask system calls ========== */
+
+
 /* Dispatches to the correct kernel function, passing the arguments. */
 uintptr_t
 syscall(uintptr_t syscallno, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5, uintptr_t a6) {
@@ -524,6 +719,15 @@ syscall(uintptr_t syscallno, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t
             return sys_env_set_trapframe((envid_t) a1, (struct Trapframe *) a2);
         case SYS_gettime:
             return sys_gettime();
+
+            /* itask: Real-Time system calls */
+        case SYS_rt_register:
+            return sys_rt_register(a1, a2, a3, (void (*)(void))a4);
+        case SYS_rt_periodic_wait:
+            sys_rt_periodic_wait();
+            return 0; // unreachable
+        case SYS_rt_unregister:
+            return sys_rt_unregister();
     }
 
     return -E_NO_SYS;

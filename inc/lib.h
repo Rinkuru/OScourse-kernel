@@ -96,6 +96,10 @@ int sys_unmap_region(envid_t env, void *pg, size_t size);
 int sys_ipc_try_send(envid_t to_env, uint64_t value, void *pg, size_t size, int perm);
 int sys_ipc_recv(void *rcv_pg, size_t size);
 int sys_gettime(void);
+/* itask: Real-time scheduling */
+int  sys_rt_register(uint64_t period_us, uint64_t deadline_us, uint64_t wcet_us, void (*handler)(void));
+void sys_rt_periodic_wait(void);
+int  sys_rt_unregister(void);
 
 int vsys_gettime(void);
 

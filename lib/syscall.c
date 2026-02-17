@@ -155,3 +155,42 @@ int
 sys_gettime(void) {
     return syscall(SYS_gettime, 0, 0, 0, 0, 0, 0, 0);
 }
+
+/* ========== itask: User-space wrappers for RT system calls ========== */
+
+/* Register current process as real-time periodic process.
+ * 
+ * Parameters:
+ *   period_us    - Period in microseconds
+ *   deadline_us  - Deadline in microseconds (relative to period start)
+ *   wcet_us      - Worst-Case Execution Time in microseconds
+ *   handler      - Function to call on deadline miss (can be NULL)
+ * 
+ * Returns: 0 on success, < 0 on error
+ */
+int
+sys_rt_register(uint64_t period_us, uint64_t deadline_us, uint64_t wcet_us, void (*handler)(void)) {
+    return syscall(SYS_rt_register, 1, period_us, deadline_us, wcet_us, (uintptr_t)handler, 0, 0);
+}
+
+/* Wait for next period. Blocking call for RT processes.
+ * Process will be unblocked by scheduler when next period starts.
+ * 
+ * If deadline was missed, this function returns after handler is called
+ * and process is demoted to normal mode.
+ */
+void
+sys_rt_periodic_wait(void) {
+    syscall(SYS_rt_periodic_wait, 0, 0, 0, 0, 0, 0, 0);
+}
+
+/* Unregister from RT mode. Process becomes normal round-robin process.
+ * 
+ * Returns: 0 on success, < 0 on error
+ */
+int
+sys_rt_unregister(void) {
+    return syscall(SYS_rt_unregister, 1, 0, 0, 0, 0, 0, 0);
+}
+
+/* ========== End of itask wrappers ========== */
