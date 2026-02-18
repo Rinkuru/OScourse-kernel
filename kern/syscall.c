@@ -538,14 +538,12 @@ sys_rt_register(uint64_t period, uint64_t deadline, uint64_t wcet, void (*handle
     }
     
     if (deadline > period) {
-        cprintf("[RT] Invalid parameters: deadline %lu > period %lu\n", 
-                deadline, period);
+        cprintf("[RT] Invalid parameters: deadline %lu > period %lu\n", deadline, period);
         return -E_INVAL;
     }
     
     if (wcet > deadline) {
-        cprintf("[RT] Invalid parameters: wcet %lu > deadline %lu\n", 
-                wcet, deadline);
+        cprintf("[RT] Invalid parameters: wcet %lu > deadline %lu\n", wcet, deadline);
         return -E_INVAL;
     }
     
@@ -573,6 +571,47 @@ sys_rt_register(uint64_t period, uint64_t deadline, uint64_t wcet, void (*handle
         now, curenv->env_rt_absolute_deadline);
     
     return 0;
+}
+
+/* itask: Handle deadline miss for an RT process.
+ * Can be called from:
+ *   - sys_rt_periodic_wait() when process calls PERIODIC_WAIT after deadline
+ *   - Timer interrupt handler when deadline expires mid-execution
+ *
+ * Installs deadline_handler into Trapframe (simulates CALL in user-space),
+ * demotes process to normal, yields to scheduler.
+ */
+void
+rt_handle_deadline_miss(struct Env *e) {
+    // Демоция: снимаем RT-статус, процесс становится обычным
+    e->env_is_rt = false;
+    e->env_status = ENV_RUNNABLE;
+
+    // Вызов user-space deadline handler через модификацию Trapframe.
+    // Аналогично механизму page_fault_upcall: симулируем CALL handler,
+    // кладя return address на пользовательский стек.
+        if (e->env_rt_deadline_handler) {
+            // Проверяем, что стек пользователя доступен для записи
+            uintptr_t new_rsp = e->env_tf.tf_rsp - sizeof(uintptr_t);
+            user_mem_assert(e, (void *)new_rsp, sizeof(uintptr_t), PROT_W);
+
+            // Кладём текущий RIP (точку возврата из PERIODIC_WAIT) на стек.
+            // После ret в handler'е процесс вернётся именно сюда.
+            uintptr_t ret_addr = e->env_tf.tf_rip;
+            nosan_memcpy((void *)new_rsp, &ret_addr, sizeof(uintptr_t));
+
+            // Обновляем RSP и RIP в Trapframe.
+            // При следующем env_run процесс начнёт выполнение с handler'а.
+            e->env_tf.tf_rsp = new_rsp;
+            e->env_tf.tf_rip = (uintptr_t)e->env_rt_deadline_handler;
+
+            cprintf("[RT] Process %08x: handler installed at %p, returns to %p\n",
+                    e->env_id,
+                    e->env_rt_deadline_handler,
+                    (void *)ret_addr);
+        }
+
+    cprintf("[RT] Process %08x demoted to normal\n", e->env_id);
 }
 
 /* itask: Wait for the next period (blocking call for periodic RT processes).
@@ -604,31 +643,10 @@ sys_rt_periodic_wait(void) {
     
     // 2. Проверка: успели до deadline?
     if (now > curenv->env_rt_absolute_deadline) {
-        cprintf("[RT] DEADLINE MISS: Process %08x missed deadline by %lu us\n",
-                curenv->env_id, now - curenv->env_rt_absolute_deadline);
-        
-        // Вызываем обработчик нарушения deadline (если задан)
-        if (curenv->env_rt_deadline_handler) {
-            // ВАЖНО: обработчик вызывается в контексте процесса
-            // Для этого нужно модифицировать Trapframe:
-            // - Сохранить текущий RIP
-            // - Установить RIP = handler
-            // - После возврата из handler восстановить выполнение
-            // 
-            // Упрощённый вариант: вызываем напрямую (небезопасно!)
-            // TODO: Правильная реализация через модификацию trapframe
-            cprintf("[RT] Calling deadline handler at %p\n", 
-                    curenv->env_rt_deadline_handler);
-            // curenv->env_rt_deadline_handler(); // НЕБЕЗОПАСНО в kernel mode
-        }
-        
-        // Переводим процесс в обычный режим
-        curenv->env_is_rt = false;
-        curenv->env_status = ENV_RUNNABLE;
-        
-        cprintf("[RT] Process %08x demoted to normal process\n", curenv->env_id);
-        
-        // Отдаём управление планировщику
+        cprintf("[RT] DEADLINE MISS: Process %08x missed by %lu us\n", curenv->env_id, now - curenv->env_rt_absolute_deadline);
+        rt_handle_deadline_miss(curenv);
+        // Отдаём управление планировщику.
+        // Когда процесс получит CPU, он окажется в начале handler().
         sched_yield();
         return; // unreachable
     }

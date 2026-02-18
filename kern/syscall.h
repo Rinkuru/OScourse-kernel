@@ -7,5 +7,6 @@
 #include <inc/syscall.h>
 
 uintptr_t syscall(uintptr_t num, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5, uintptr_t a6);
+void rt_handle_deadline_miss(struct Env *e);
 
 #endif /* !JOS_KERN_SYSCALL_H */

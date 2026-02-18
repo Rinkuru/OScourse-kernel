@@ -17,6 +17,7 @@
 #include <kern/timer.h>
 #include <kern/vsyscall.h>
 #include <kern/traceopt.h>
+#include <kern/tsc.h>
 
 static struct Taskstate ts;
 
@@ -318,6 +319,13 @@ trap_dispatch(struct Trapframe *tf) {
         // LAB 12: Your code here
         timer_for_schedule->handle_interrupts();
         vsys[VSYS_gettime] = gettime();
+        // itask: Проверяем deadline текущего RT-процесса
+        if (curenv && curenv->env_is_rt) {
+            uint64_t now = get_current_time_us();
+            if (now > curenv->env_rt_absolute_deadline) {
+                rt_handle_deadline_miss(curenv);
+            }
+        }
         sched_yield();
         return;
         // LAB 11: Your code here
