@@ -25,22 +25,47 @@ sched_yield(void) {
      * below to halt the cpu */
 
     // LAB 3: Your code here:
-    if (curenv && curenv->env_status == ENV_DYING) {
+    if (curenv && curenv->env_status == ENV_DYING) {  //освобождаем если зомби
         env_free(curenv);
         curenv = NULL;
     }
+
+    /* ====================================================
+     * itask: ищем RT-процесс с ближайшим дедлайном
+     *
+     * Проходим по всем envs[] один раз (O(n)), при n = 1024.
+     * Среди всех ENV_RUNNABLE с env_is_rt == true
+     * выбираем тот, у кого env_rt_absolute_deadline минимален.
+     * ==================================================== */
+    struct Env *edf_best = NULL;
+
+    for (int i = 0; i < NENV; i++) {
+
+        if (envs[i].env_status != ENV_RUNNABLE || !envs[i].env_is_rt)
+            continue;
+
+        if (edf_best == NULL || envs[i].env_rt_absolute_deadline < edf_best->env_rt_absolute_deadline) {
+            edf_best = &envs[i];
+        }
+    }
+
+    if (edf_best) {
+        env_run(edf_best);
+    }
+
+    // Round Robin
     int start_idx = curenv ? (curenv - envs + 1) % NENV : 0;
     for (int i = start_idx; i < NENV; ++i) {
-        if (envs[i].env_status == ENV_RUNNABLE) {
+        if (envs[i].env_status == ENV_RUNNABLE && !envs[i].env_is_rt) {
             env_run(&envs[i]);
         }
     }
     for (int i = 0; i < start_idx; ++i) {
-        if (envs[i].env_status == ENV_RUNNABLE) {
+        if (envs[i].env_status == ENV_RUNNABLE && !envs[i].env_is_rt) {
             env_run(&envs[i]);
         }
     }
-    if (curenv && curenv->env_status == ENV_RUNNING) {
+    if (curenv && curenv->env_status == ENV_RUNNING && !curenv->env_is_rt) {
         env_run(curenv);
     }
 
