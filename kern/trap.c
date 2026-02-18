@@ -319,11 +319,39 @@ trap_dispatch(struct Trapframe *tf) {
         // LAB 12: Your code here
         timer_for_schedule->handle_interrupts();
         vsys[VSYS_gettime] = gettime();
-        // itask: Проверяем deadline текущего RT-процесса
-        if (curenv && curenv->env_is_rt) {
-            uint64_t now = get_current_time_us();
-            if (now > curenv->env_rt_absolute_deadline) {
-                rt_handle_deadline_miss(curenv);
+        // itask:
+        uint64_t now = get_current_time_us();
+        // считаем время выполнения текущего RT-процесса.
+        // Вызывается на каждом тике, пока процесс в состоянии RUNNING.
+        if (curenv && curenv->env_is_rt && curenv->env_status == ENV_RUNNING) {
+            if (curenv->env_rt_last_tick > 0) {
+                curenv->env_rt_exec_time += now - curenv->env_rt_last_tick;
+            }
+            curenv->env_rt_last_tick = now;
+        }
+
+        // пробуждение и дедлайн-мисс для всех RT-процессов.
+        for (int i = 0; i < NENV; i++) {
+
+            if (envs[i].env_status == ENV_FREE || !envs[i].env_is_rt)
+                continue;
+
+            // Пробуждение: наступил следующий период —
+            // переводим из NOT_RUNNABLE в RUNNABLE.
+            // Это разблокирует процесс после PERIODIC_WAIT.
+            if (envs[i].env_status == ENV_NOT_RUNNABLE && now >= envs[i].env_rt_next_period) {
+                envs[i].env_status = ENV_RUNNABLE;
+                envs[i].env_rt_last_tick = 0;
+                cprintf("[RT] Process %08x woken up for new period\n", envs[i].env_id);
+            }
+
+            // дедлайн-мисс по таймеру:
+            // процесс выполняется (RUNNING или RUNNABLE), но дедлайн уже истёк.
+            // RUNNING:  процесс сейчас на CPU и не успел вызвать PERIODIC_WAIT
+            // RUNNABLE: процесс готов, но планировщик его ещё не запустил
+            if ((envs[i].env_status == ENV_RUNNING || envs[i].env_status == ENV_RUNNABLE) &&
+                now > envs[i].env_rt_absolute_deadline) {
+                rt_handle_deadline_miss(&envs[i]);
             }
         }
         sched_yield();

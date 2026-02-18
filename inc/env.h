@@ -88,11 +88,12 @@ struct Env {
     uint64_t env_rt_period;            // Период (в микросекундах или тиках)
     uint64_t env_rt_deadline;          // Относительный deadline от начала периода
     uint64_t env_rt_wcet;              // Worst-Case Execution Time (оценка сверху)
-    
+
     uint64_t env_rt_next_period;       // Абсолютное время начала следующего периода
     uint64_t env_rt_absolute_deadline; // Абсолютный deadline текущего периода
     uint64_t env_rt_exec_time;         // Время выполнения в текущем периоде
-    
+    uint64_t env_rt_last_tick;         // Время последнего тика для этого процесса
+
     void (*env_rt_deadline_handler)(void); // Обработчик нарушения deadline
 };
 
