@@ -563,17 +563,17 @@ sys_rt_register(uint64_t period, uint64_t deadline, uint64_t wcet, uint8_t prior
     curenv->env_rt_period = period;
     curenv->env_rt_deadline = deadline;
     curenv->env_rt_wcet = wcet;
+    curenv->priority = priority;
     curenv->env_rt_deadline_handler = handler;
 
-    // Кладем процесс в соответствующую очередь
-    rt_push_to_queue(curenv);
-
-    
     // Инициализируем временные параметры первого периода
     uint64_t now = get_current_time_us();
     curenv->env_rt_next_period = now + period;
     curenv->env_rt_absolute_deadline = now + deadline;
     curenv->env_rt_exec_time = 0;
+
+    // Кладем процесс в соответствующую очередь
+    rt_push_to_queue(curenv);
     
     cprintf("[RT] Process %08x registered: period=%lu, deadline=%lu, wcet=%lu\n",
             curenv->env_id, period, deadline, wcet);
