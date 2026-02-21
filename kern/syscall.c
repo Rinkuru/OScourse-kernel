@@ -518,6 +518,7 @@ rt_admission_control(uint64_t new_period, uint64_t new_wcet) {
  *   period    - Period in microseconds (how often the process runs)
  *   deadline  - Relative deadline from period start (must be <= period)
  *   wcet      - Worst-Case Execution Time estimate (must be <= deadline)
+ *   priority  - Just priority
  *   handler   - User-space function to call on deadline miss (can be NULL)
  * 
  * Returns:
