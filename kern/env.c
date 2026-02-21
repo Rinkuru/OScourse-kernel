@@ -30,6 +30,8 @@ struct Env *envs = env_array;
 #else
 /* All environments */
 struct Env *envs = NULL;
+/* Itask */
+struct queue rt_priority_queues[ARINC_MAX_PRIORITY];
 #endif
 
 /* Virtual syscall page address */
@@ -86,6 +88,31 @@ envid2env(envid_t envid, struct Env **env_store, bool need_check_perm) {
     return 0;
 }
 
+/* Itask: init array of queue */
+
+void
+queue_init(void){
+    for (int i = 0; i < ARINC_MAX_PRIORITY; i++) {
+        rt_priority_queues[i].first = NULL;
+        rt_priority_queues[i].last = NULL;
+    }
+}
+
+/* Itask: move Env to the array of queue according to its priority*/
+void
+rt_push_to_queue(struct Env *env) {
+    env->queue_next = NULL;
+    uint8_t priority = env->priority;
+    if (rt_priority_queues[priority].first == NULL) { // => очередь пуста
+        rt_priority_queues[priority].first = curenv;
+        rt_priority_queues[priority].last = curenv;
+    }
+    else {
+        rt_priority_queues[priority].last->queue_next = curenv;
+        rt_priority_queues[priority].last = curenv;
+    }
+}
+
 /* Mark all environments in 'envs' as free, set their env_ids to 0,
  * and insert them into the env_free_list.
  * Make sure the environments are in the free list in the same order
@@ -132,6 +159,8 @@ env_init(void) {
         memset(&envs[i].env_tf, 0, sizeof(envs[i].env_tf));
     }
     env_free_list = envs;
+    /* Itask */
+    queue_init();
 }
 
 /* Allocates and initializes a new environment.

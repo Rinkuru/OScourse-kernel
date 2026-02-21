@@ -526,13 +526,13 @@ rt_admission_control(uint64_t new_period, uint64_t new_wcet) {
  *   -E_NO_FREE_ENV if admission control fails (system overload)
  */
 static int
-sys_rt_register(uint64_t period, uint64_t deadline, uint64_t wcet, void (*handler)(void)) {
+sys_rt_register(uint64_t period, uint64_t deadline, uint64_t wcet, uint8_t priority, void (*handler)(void)) {
     if (!curenv) {
         return -E_BAD_ENV;
     }
     
     // Проверка корректности параметров
-    if (period == 0 || deadline == 0 || wcet == 0) {
+    if (period == 0 || deadline == 0 || wcet == 0 || priority < 0 || priority > 239) {
         cprintf("[RT] Invalid parameters: period/deadline/wcet must be > 0\n");
         return -E_INVAL;
     }
@@ -558,6 +558,10 @@ sys_rt_register(uint64_t period, uint64_t deadline, uint64_t wcet, void (*handle
     curenv->env_rt_deadline = deadline;
     curenv->env_rt_wcet = wcet;
     curenv->env_rt_deadline_handler = handler;
+
+    // Кладем процесс в соответствующую очередь
+    rt_push_to_queue(curenv);
+
     
     // Инициализируем временные параметры первого периода
     uint64_t now = get_current_time_us();
@@ -740,7 +744,7 @@ syscall(uintptr_t syscallno, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t
 
             /* itask: Real-Time system calls */
         case SYS_rt_register:
-            return sys_rt_register(a1, a2, a3, (void (*)(void))a4);
+            return sys_rt_register(a1, a2, a3, a4, (void (*)(void))a5);
         case SYS_rt_periodic_wait:
             sys_rt_periodic_wait();
             return 0; // unreachable

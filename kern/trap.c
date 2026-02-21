@@ -342,6 +342,8 @@ trap_dispatch(struct Trapframe *tf) {
             if (envs[i].env_status == ENV_NOT_RUNNABLE && now >= envs[i].env_rt_next_period) {
                 envs[i].env_status = ENV_RUNNABLE;
                 envs[i].env_rt_last_tick = 0;
+                //Кладем процесс в очередь
+                rt_push_to_queue(&envs[i]);
                 cprintf("[RT] Process %08x woken up for new period\n", envs[i].env_id);
             }
 

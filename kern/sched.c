@@ -31,22 +31,19 @@ sched_yield(void) {
     }
 
     /* ====================================================
-     * itask: ищем RT-процесс с ближайшим дедлайном
-     *
-     * Проходим по всем envs[] один раз (O(n)), при n = 1024.
-     * Среди всех ENV_RUNNABLE с env_is_rt == true
-     * выбираем тот, у кого env_rt_absolute_deadline минимален.
+     * itask: ищем RT-процесс с наивысшим приоритетом, 
+     * среди них используем порядок FIFO.
+     * Если RT-процессов нет, выбираем по round-robin
+     * обычные процессы.
      * ==================================================== */
     struct Env *edf_best = NULL;
 
-    for (int i = 0; i < NENV; i++) {
-
-        if (envs[i].env_status != ENV_RUNNABLE || !envs[i].env_is_rt)
+    for (int priority = ARINC_MAX_PRIORITY; priority >= 0; priority--) {
+        if (rt_priority_queues[priority].first == NULL) { // Пустая очередь
             continue;
-
-        if (edf_best == NULL || envs[i].env_rt_absolute_deadline < edf_best->env_rt_absolute_deadline) {
-            edf_best = &envs[i];
         }
+        edf_best = rt_priority_queues[priority].first;
+        rt_priority_queues[priority].first = rt_priority_queues[priority].first->queue_next;
     }
 
     if (edf_best) {

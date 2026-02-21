@@ -93,8 +93,18 @@ struct Env {
     uint64_t env_rt_absolute_deadline; // Абсолютный deadline текущего периода
     uint64_t env_rt_exec_time;         // Время выполнения в текущем периоде
     uint64_t env_rt_last_tick;         // Время последнего тика для этого процесса
+    uint8_t priority;                  // Приоритет процесса (в соответствии с ARINC-653 от 0 по 239)
 
+    struct Env *queue_next;                   // Следующий процесс в rt_priority_queues с данным приоритетом
     void (*env_rt_deadline_handler)(void); // Обработчик нарушения deadline
 };
+
+struct queue {
+    struct Env *first;
+    struct Env *last;
+};
+
+#define ARINC_MAX_PRIORITY 239
+extern struct queue *rt_priority_queues; // Очереди по приоритетам процессов
 
 #endif /* !JOS_INC_ENV_H */
