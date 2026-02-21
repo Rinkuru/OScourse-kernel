@@ -169,8 +169,8 @@ sys_gettime(void) {
  * Returns: 0 on success, < 0 on error
  */
 int
-sys_rt_register(uint64_t period_us, uint64_t deadline_us, uint64_t wcet_us, void (*handler)(void)) {
-    return syscall(SYS_rt_register, 1, period_us, deadline_us, wcet_us, (uintptr_t)handler, 0, 0);
+sys_rt_register(uint64_t period_us, uint64_t deadline_us, uint64_t wcet_us, uint8_t priority, void (*handler)(void)) {
+    return syscall(SYS_rt_register, 1, period_us, deadline_us, wcet_us, priority, (uintptr_t)handler, 0);
 }
 
 /* Wait for next period. Blocking call for RT processes.

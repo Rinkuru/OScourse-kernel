@@ -97,7 +97,7 @@ int sys_ipc_try_send(envid_t to_env, uint64_t value, void *pg, size_t size, int 
 int sys_ipc_recv(void *rcv_pg, size_t size);
 int sys_gettime(void);
 /* itask: Real-time scheduling */
-int  sys_rt_register(uint64_t period_us, uint64_t deadline_us, uint64_t wcet_us, void (*handler)(void));
+int  sys_rt_register(uint64_t period_us, uint64_t deadline_us, uint64_t wcet_us, uint8_t priority, void (*handler)(void));
 void sys_rt_periodic_wait(void);
 int  sys_rt_unregister(void);
 
