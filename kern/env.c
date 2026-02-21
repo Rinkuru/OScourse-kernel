@@ -31,7 +31,7 @@ struct Env *envs = env_array;
 /* All environments */
 struct Env *envs = NULL;
 /* Itask */
-struct queue rt_priority_queues[ARINC_MAX_PRIORITY];
+struct queue rt_priority_queues[ARINC_MAX_PRIORITY + 1];
 #endif
 
 /* Virtual syscall page address */
@@ -91,7 +91,7 @@ envid2env(envid_t envid, struct Env **env_store, bool need_check_perm) {
 /* Itask: init array of queue */
 void
 queue_init(void){
-    for (int i = ARINC_MIN_PRIORITY; i < ARINC_MAX_PRIORITY; i++) {
+    for (int i = ARINC_MIN_PRIORITY; i <= ARINC_MAX_PRIORITY; i++) {
         rt_priority_queues[i].first = NULL;
         rt_priority_queues[i].last = NULL;
     }

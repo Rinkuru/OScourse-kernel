@@ -106,6 +106,6 @@ struct queue {
 
 #define ARINC_MAX_PRIORITY 239
 #define ARINC_MIN_PRIORITY 1
-extern struct queue *rt_priority_queues; // Очереди по приоритетам процессов
+extern struct queue rt_priority_queues[ARINC_MAX_PRIORITY + 1]; // Очереди по приоритетам процессов
 
 #endif /* !JOS_INC_ENV_H */
