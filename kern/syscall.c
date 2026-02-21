@@ -532,8 +532,13 @@ sys_rt_register(uint64_t period, uint64_t deadline, uint64_t wcet, uint8_t prior
     }
     
     // Проверка корректности параметров
-    if (period == 0 || deadline == 0 || wcet == 0 || priority < 0 || priority > 239) {
-        cprintf("[RT] Invalid parameters: period/deadline/wcet must be > 0\n");
+    if (period <= 0 || deadline <= 0 || wcet <= 0) {
+        cprintf("[RT] Invalid parameters: period, deadline and wcet must be > 0\n");
+        return -E_INVAL;
+    }
+
+    if (priority < ARINC_MIN_PRIORITY || priority > ARINC_MAX_PRIORITY) {
+        cprintf("[RT] Invalid parameters: priority should be between %d and %d\n", ARINC_MIN_PRIORITY, ARINC_MAX_PRIORITY);
         return -E_INVAL;
     }
     
