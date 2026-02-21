@@ -103,12 +103,12 @@ rt_push_to_queue(struct Env *env) {
     env->queue_next = NULL;
     uint8_t priority = env->priority;
     if (rt_priority_queues[priority].first == NULL) { // => очередь пуста
-        rt_priority_queues[priority].first = curenv;
-        rt_priority_queues[priority].last = curenv;
+        rt_priority_queues[priority].first = env;
+        rt_priority_queues[priority].last = env;
     }
     else {
-        rt_priority_queues[priority].last->queue_next = curenv;
-        rt_priority_queues[priority].last = curenv;
+        rt_priority_queues[priority].last->queue_next = env;
+        rt_priority_queues[priority].last = env;
     }
 }
 
