@@ -353,6 +353,10 @@ trap_dispatch(struct Trapframe *tf) {
             // RUNNABLE: процесс готов, но планировщик его ещё не запустил
             if ((envs[i].env_status == ENV_RUNNING || envs[i].env_status == ENV_RUNNABLE) &&
                 now > envs[i].env_rt_absolute_deadline) {
+                cprintf("[RT] DEADLINE MISS (trap_dispatch): Process %08x missed by %lu us\n", 
+                    curenv->env_id, 
+                    now - curenv->env_rt_absolute_deadline
+                );
                 rt_handle_deadline_miss(&envs[i]);
             }
         }

@@ -502,12 +502,12 @@ rt_admission_control(uint64_t new_period, uint64_t new_wcet) {
     // Проверяем: не превышает ли суммарная утилизация 95% 
     // (оставляем 5% запас для накладных расходов ядра)
     if (total_utilization > 0.95) {
-        cprintf("[RT] Admission control failed: utilization %.2f > 0.95\n", 
+        cprintf("[RT] Admission control failed: utilization %f > 0.95\n", 
                 total_utilization);
         return false;
     }
     
-    cprintf("[RT] Admission control passed: utilization %.2f <= 0.95\n", 
+    cprintf("[RT] Admission control passed: utilization %f <= 0.95\n", 
             total_utilization);
     return true;
 }
@@ -592,7 +592,9 @@ sys_rt_register(uint64_t period, uint64_t deadline, uint64_t wcet, uint8_t prior
  */
 void
 rt_handle_deadline_miss(struct Env *e) {
-    // Демоция: снимаем RT-статус, процесс становится обычным
+    // Снимаем RT-статус, процесс становится обычным
+
+    cprintf("[RT] rt_handle_deadline_miss started work by process %08x\n", e->env_id);
     e->env_is_rt = false;
     e->env_status = ENV_RUNNABLE;
 
@@ -621,6 +623,7 @@ rt_handle_deadline_miss(struct Env *e) {
         }
 
     cprintf("[RT] Process %08x demoted to normal\n", e->env_id);
+    cprintf("[RT] rt_handle_deadline_miss finished work by process %08x\n", e->env_id);
 }
 
 /* itask: Wait for the next period (blocking call for periodic RT processes).
@@ -635,6 +638,7 @@ rt_handle_deadline_miss(struct Env *e) {
  */
 static void
 sys_rt_periodic_wait(void) {
+    cprintf("[RT] sys_rt_periodic_wait started work by process %08x\n", curenv->env_id);
     if (!curenv || !curenv->env_is_rt) {
         // Обычный процесс вызвал PERIODIC_WAIT - просто отдаём управление
         cprintf("[RT] Warning: non-RT process called periodic_wait, yielding\n");
@@ -652,7 +656,7 @@ sys_rt_periodic_wait(void) {
     
     // 2. Проверка: успели до deadline?
     if (now > curenv->env_rt_absolute_deadline) {
-        cprintf("[RT] DEADLINE MISS: Process %08x missed by %lu us\n", curenv->env_id, now - curenv->env_rt_absolute_deadline);
+        cprintf("[RT] DEADLINE MISS (sys_rt_periodic_wait): Process %08x missed by %lu us\n", curenv->env_id, now - curenv->env_rt_absolute_deadline);
         rt_handle_deadline_miss(curenv);
         // Отдаём управление планировщику.
         // Когда процесс получит CPU, он окажется в начале handler().
@@ -672,6 +676,7 @@ sys_rt_periodic_wait(void) {
         curenv->env_id, curenv->env_rt_next_period, now);
     
     // Отдаём управление планировщику
+    cprintf("[RT] sys_rt_periodic_wait finished work by process %08x\n", curenv->env_id);
     sched_yield();
 }
 
