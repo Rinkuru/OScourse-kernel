@@ -38,7 +38,7 @@ sched_yield(void) {
      * ==================================================== */
     struct Env *edf_best = NULL;
 
-    for (int priority = ARINC_MAX_PRIORITY; priority >= 0; priority--) {
+    for (int priority = ARINC_MAX_PRIORITY; priority >= ARINC_MIN_PRIORITY; priority--) {
         if (rt_priority_queues[priority].first == NULL) { // Пустая очередь
             continue;
         }
