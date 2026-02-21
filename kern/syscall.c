@@ -528,7 +528,7 @@ rt_admission_control(uint64_t new_period, uint64_t new_wcet) {
  */
 static int
 sys_rt_register(uint64_t period, uint64_t deadline, uint64_t wcet, uint8_t priority, void (*handler)(void)) {
-    if (!curenv) {
+    if (!curenv || curenv->env_is_rt) { // если он уже rt, то не разрешим повторного вызова.
         return -E_BAD_ENV;
     }
     
