@@ -660,7 +660,7 @@ sys_rt_periodic_wait(void) {
     
     // 4. Обновляем параметры для следующего периода
     curenv->env_rt_next_period += curenv->env_rt_period;
-    curenv->env_rt_absolute_deadline += curenv->env_rt_period;
+    curenv->env_rt_absolute_deadline = curenv->env_rt_next_period + curenv->env_rt_deadline;
     curenv->env_rt_exec_time = 0;
 
     cprintf("[RT] Process %08x waiting for next period at %lu us (current: %lu us)\n",
