@@ -42,8 +42,14 @@ sched_yield(void) {
         if (rt_priority_queues[priority].first == NULL) { // Пустая очередь
             continue;
         }
-        edf_best = rt_priority_queues[priority].first;
-        rt_priority_queues[priority].first = rt_priority_queues[priority].first->queue_next;
+        
+        struct queue *q = &rt_priority_queues[priority];
+        edf_best = q->first;
+        q->first = edf_best->queue_next;
+        if (!q->first)
+            q->last = NULL;
+        edf_best->queue_next = NULL;
+        break;
     }
 
     if (edf_best) {
