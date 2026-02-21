@@ -568,7 +568,7 @@ sys_rt_register(uint64_t period, uint64_t deadline, uint64_t wcet, uint8_t prior
 
     // Инициализируем временные параметры первого периода
     uint64_t now = get_current_time_us();
-    curenv->env_rt_next_period = now + period;
+    curenv->env_rt_next_period = now;
     curenv->env_rt_absolute_deadline = now + deadline;
     curenv->env_rt_exec_time = 0;
 
