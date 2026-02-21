@@ -575,8 +575,8 @@ sys_rt_register(uint64_t period, uint64_t deadline, uint64_t wcet, uint8_t prior
     // Кладем процесс в соответствующую очередь
     rt_push_to_queue(curenv);
     
-    cprintf("[RT] Process %08x registered: period=%lu, deadline=%lu, wcet=%lu\n",
-            curenv->env_id, period, deadline, wcet);
+    cprintf("[RT] Process %08x registered: period=%lu, deadline=%lu, wcet=%lu, priority=%lu\n",
+            curenv->env_id, period, deadline, wcet, priority);
     cprintf("[RT] Current time: %lu us, first deadline at %lu us\n",
         now, curenv->env_rt_absolute_deadline);
     
