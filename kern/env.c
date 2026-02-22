@@ -639,6 +639,10 @@ env_run(struct Env *env) {
     if (curenv != env) {
         if (curenv && curenv->env_status == ENV_RUNNING) {
             curenv->env_status = ENV_RUNNABLE;
+            
+            // if (curenv->env_is_rt) {
+            //     rt_push_to_queue(curenv);
+            // }
         }
         curenv = env;
         curenv->env_status = ENV_RUNNING;

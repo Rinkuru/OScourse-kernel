@@ -418,6 +418,10 @@ ifneq ($(V),@)
 GRADEFLAGS += -v
 endif
 
+# itask: Для теста планировщика
+test-scheduler:
+	./grade-scheduler
+
 grade:
 	@echo $(MAKE) clean
 	@$(MAKE) clean || \

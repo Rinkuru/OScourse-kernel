@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from gradelib import *
+import re
+
+r = Runner(save("jos.out"),
+           stop_breakpoint("cons_getc"))
+
+@test(1)
+def test_reg_ok():
+    r.user_test("rtregok", timeout=20)
+    r.match("OK: registered")
+
+@test(1)
+def test_deadline_miss():
+    r.user_test("rtdeadlinemiss", timeout=20)
+    r.match("OK: registered")
+    r.match("Deadline missed handler was called!")
+
+@test(1)
+def test_many_processes_ok():
+    r.user_test("rtmanyprocessesok", timeout=50)
+    for i in range(1, 1001):
+        r.match(f'{i} OK: registered')
+
+@test(1)
+def test_admission_control_fail():
+    r.user_test("rtadmissionctrlfail", timeout=20)
+    r.match("Admission control fail")
+
+@test(1)
+def test_priority_correct():
+    pids = {10: None, 200: None}
+    picks = []  # список кортежей (pid, prio)
+
+    # 1) ловим регистрации и достаём pid по приоритету
+    def on_registered(line):
+        m = re.match(r"\[RT\] Process ([0-9a-fA-F]{8}) registered: .*priority=(\d+)", line)
+        pid = m.group(1)
+        prio = int(m.group(2))
+        if prio in pids and pids[prio] is None:
+            pids[prio] = pid
+
+    # 2) ловим RT pick и пишем в picks
+    def on_pick(line):
+        m = re.match(r"RT pick ([0-9a-fA-F]{8}).*priority=(\d+)", line)
+        if not m:
+            return
+        pid = m.group(1)
+        prio = int(m.group(2))
+        if prio in (10, 200):
+            picks.append((pid, prio))
+
+    r.user_test(
+        "rtprioritycorrect",
+        call_on_line(r"^\[RT\] Process [0-9a-fA-F]{8} registered: .*priority=(10|200)", on_registered),
+        call_on_line(r"^RT pick [0-9a-fA-F]{8} .*priority=(10|200)", on_pick),
+        timeout=30,
+    )
+
+    assert pids[10] is not None, "Did not see registration of prio=10"
+    assert pids[200] is not None, "Did not see registration of prio=200"
+
+    pairs = 4
+
+    for k in range(pairs):
+        a = picks[2*k]
+        b = picks[2*k + 1]
+        assert_equal(a, (pids[200], 200), f"Pair {k}: expected high-prio first")
+        assert_equal(b, (pids[10], 10),   f"Pair {k}: expected low-prio second")
+
+    r.match("Parent: all children finished")
+
+@test(1)
+def test_same_priority():
+    r.user_test("rtsamepriority", timeout=60)
+
+    out = r.qemu.output
+
+    # Парсим строки вида: [env XXXXXXXX] i=N
+    by_env = {}
+    for line in out.splitlines():
+        m = re.match(r"^\[env ([0-9a-fA-F]{8})\] i=(\d+)$", line.strip())
+        if not m:
+            continue
+        eid = m.group(1).lower()
+        i = int(m.group(2))
+        by_env.setdefault(eid, set()).add(i)
+
+    # Если вообще ничего не напечатали — тест должен падать
+    if not by_env:
+        raise AssertionError("Не найдено ни одной строки '[env XXXXXXXX] i=N'")
+
+    # Для каждого env, который встретился, требуем полный набор 0..49
+    need = set(range(50))
+
+    for eid, seen in by_env.items():
+        if not need.issubset(seen):
+            raise AssertionError(f"env {eid} did not finish all i=0..49")
+
+run_tests()
