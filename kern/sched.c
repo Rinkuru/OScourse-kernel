@@ -67,7 +67,7 @@ sched_yield(void) {
     }
 
     if (edf_best) {
-        cprintf("RT pick %08x status=%d is_rt=%d\n", edf_best->env_id, edf_best->env_status, edf_best->env_is_rt);
+        cprintf("RT pick %08x status=%d is_rt=%d priority=%d\n", edf_best->env_id, edf_best->env_status, edf_best->env_is_rt, edf_best->priority);
         env_run(edf_best);
     }
 
