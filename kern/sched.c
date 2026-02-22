@@ -44,15 +44,30 @@ sched_yield(void) {
         }
         
         struct queue *q = &rt_priority_queues[priority];
-        edf_best = q->first;
-        q->first = edf_best->queue_next;
-        if (!q->first)
-            q->last = NULL;
-        edf_best->queue_next = NULL;
-        break;
+         // Пытаемся найти валидный env, вычищая мусор с головы очереди
+        while (q->first != NULL) {
+            struct Env *e = q->first;
+
+            // pop head
+            q->first = e->queue_next;
+            if (!q->first)
+                q->last = NULL;
+            e->queue_next = NULL;
+
+            // Проверяем валидность кандидата
+            // Нам нужен env, который реально может быть запущен сейчас
+            if (e->env_is_rt && e->env_status == ENV_RUNNABLE) {
+                edf_best = e;
+                break;
+            }
+        }
+
+        if (edf_best)
+            break;
     }
 
     if (edf_best) {
+        cprintf("RT pick %08x status=%d is_rt=%d\n", edf_best->env_id, edf_best->env_status, edf_best->env_is_rt);
         env_run(edf_best);
     }
 
