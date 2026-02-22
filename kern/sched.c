@@ -56,7 +56,7 @@ sched_yield(void) {
 
             // Проверяем валидность кандидата
             // Нам нужен env, который реально может быть запущен сейчас
-            if (e->env_is_rt && e->env_status == ENV_RUNNABLE) {
+            if (e->env_is_rt && (e->env_status == ENV_RUNNABLE || e->env_status == ENV_RUNNING)) {
                 edf_best = e;
                 break;
             }

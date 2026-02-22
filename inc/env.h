@@ -84,7 +84,7 @@ struct Env {
     int env_ipc_perm;        /* Perm of page mapping received */
 
     /* itask */
-    bool env_is_rt;                   // Флаг: процесс реального времени?
+    bool env_is_rt;                    // Флаг: процесс реального времени?
     uint64_t env_rt_period;            // Период (в микросекундах или тиках)
     uint64_t env_rt_deadline;          // Относительный deadline от начала периода
     uint64_t env_rt_wcet;              // Worst-Case Execution Time (оценка сверху)
@@ -93,7 +93,8 @@ struct Env {
     uint64_t env_rt_absolute_deadline; // Абсолютный deadline текущего периода
     uint64_t env_rt_exec_time;         // Время выполнения в текущем периоде
     uint64_t env_rt_last_tick;         // Время последнего тика для этого процесса
-    uint8_t priority;                  // Приоритет процесса (в соответствии с ARINC-653 от 0 по 239)
+    uint8_t priority;                  // Приоритет процесса (в соответствии с ARINC-653 с 1 по 239)
+    bool env_rt_miss_pending;          // Показывает является ли дедлайн пропущенным
 
     struct Env *queue_next;                   // Следующий процесс в rt_priority_queues с данным приоритетом
     void (*env_rt_deadline_handler)(void); // Обработчик нарушения deadline

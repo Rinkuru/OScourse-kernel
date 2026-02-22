@@ -352,12 +352,16 @@ trap_dispatch(struct Trapframe *tf) {
             // RUNNING:  процесс сейчас на CPU и не успел вызвать PERIODIC_WAIT
             // RUNNABLE: процесс готов, но планировщик его ещё не запустил
             if ((envs[i].env_status == ENV_RUNNING || envs[i].env_status == ENV_RUNNABLE) &&
-                get_current_time_us() > envs[i].env_rt_absolute_deadline) {
-                cprintf("[RT] DEADLINE MISS (trap_dispatch): Process %08x missed by %lu us\n", 
-                    envs[i].env_id, 
-                    get_current_time_us() - envs[i].env_rt_absolute_deadline
-                );
-                rt_handle_deadline_miss(&envs[i]);
+                now > envs[i].env_rt_absolute_deadline) {
+
+                cprintf("[RT] DEADLINE MISS (trap_dispatch): Process %08x missed by %lu us\n",
+                        envs[i].env_id, now - envs[i].env_rt_absolute_deadline);
+
+                if (&envs[i] == curenv) {
+                    rt_handle_deadline_miss(curenv);
+                } else {
+                    envs[i].env_rt_miss_pending = true;
+                }
             }
         }
         sched_yield();

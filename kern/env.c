@@ -19,6 +19,7 @@
 #include <kern/traceopt.h>
 #include <kern/trap.h>
 #include <kern/vsyscall.h>
+#include <kern/syscall.h>
 
 /* Currently active environment */
 struct Env *curenv = NULL;
@@ -643,6 +644,12 @@ env_run(struct Env *env) {
         curenv->env_status = ENV_RUNNING;
         ++curenv->env_runs;
         switch_address_space(&curenv->address_space);
+
+        // itask: если дедлайн пропущен, то процесс опущен
+        if (curenv->env_rt_miss_pending) {
+            curenv->env_rt_miss_pending = false;
+            rt_handle_deadline_miss(curenv);
+        }
     }
     env_pop_tf(&curenv->env_tf);
 
