@@ -15,7 +15,8 @@ extern struct Segdesc32 gdt[];
 
 
 void queue_init(void);
-void rt_push_to_queue(struct Env *env); 
+void rt_push_to_queue(struct Env *env);
+void rt_remove_from_queue(struct Env *env);
 void env_init(void);
 int env_alloc(struct Env **penv, envid_t parent_id, enum EnvType type);
 void env_free(struct Env *env);

@@ -601,6 +601,7 @@ rt_handle_deadline_miss(struct Env *e) {
     // Снимаем RT-статус, процесс становится обычным
 
     cprintf("[RT] rt_handle_deadline_miss started work by process %08x\n", e->env_id);
+    rt_remove_from_queue(e);
     e->env_is_rt = false;
     e->env_status = ENV_RUNNABLE;
 
@@ -701,9 +702,10 @@ sys_rt_unregister(void) {
         return -E_INVAL; // Процесс и так не RT
     }
     
+    rt_remove_from_queue(curenv);
     curenv->env_is_rt = false;
     cprintf("[RT] Process %08x unregistered from RT mode\n", curenv->env_id);
-    
+    sched_yield();
     return 0;
 }
 

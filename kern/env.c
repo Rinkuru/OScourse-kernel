@@ -113,6 +113,37 @@ rt_push_to_queue(struct Env *env) {
     }
 }
 
+/* itask: Удаляем env из очереди по его приоритету. */
+void rt_remove_from_queue(struct Env *env) {
+    uint8_t priority = env->priority;
+    struct queue *q = &rt_priority_queues[priority];
+
+    if (q->first == NULL || (env->queue_next == NULL && q->last != env))
+        return;
+
+    // env — голова очереди
+    if (q->first == env) {
+        q->first = env->queue_next;
+        if (q->first == NULL)
+            q->last = NULL;
+        env->queue_next = NULL;
+        return;
+    }
+
+    // ищем предыдущий элемент
+    struct Env *prev = q->first;
+    while (prev->queue_next != NULL && prev->queue_next != env) {
+        prev = prev->queue_next;
+    }
+
+    if (prev->queue_next == env) {
+        prev->queue_next = env->queue_next;
+        if (env->queue_next == NULL)
+            q->last = prev;
+        env->queue_next = NULL;
+    }
+}
+
 /* Mark all environments in 'envs' as free, set their env_ids to 0,
  * and insert them into the env_free_list.
  * Make sure the environments are in the free list in the same order
