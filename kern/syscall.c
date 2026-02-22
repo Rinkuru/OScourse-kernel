@@ -502,13 +502,13 @@ rt_admission_control(uint64_t new_period, uint64_t new_wcet) {
     // Проверяем: не превышает ли суммарная утилизация 95% 
     // (оставляем 5% запас для накладных расходов ядра)
     if (total_utilization > 0.95) {
-        cprintf("[RT] Admission control failed: utilization %f > 0.95\n", 
-                total_utilization);
+        cprintf("[RT] Admission control failed: utilization %lu > 95 percent\n", 
+                (uint64_t) (total_utilization * 100));
         return false;
     }
     
-    cprintf("[RT] Admission control passed: utilization %f <= 0.95\n", 
-            total_utilization);
+    cprintf("[RT] Admission control passed: utilization %lu <= 95 percent \n", 
+            (uint64_t) (total_utilization * 100));
     return true;
 }
 
@@ -565,6 +565,7 @@ sys_rt_register(uint64_t period, uint64_t deadline, uint64_t wcet, uint8_t prior
     curenv->env_rt_wcet = wcet;
     curenv->priority = priority;
     curenv->env_rt_deadline_handler = handler;
+    curenv->env_rt_miss_pending = false;
 
     // Инициализируем временные параметры первого периода
     uint64_t now = get_current_time_us();
@@ -574,8 +575,12 @@ sys_rt_register(uint64_t period, uint64_t deadline, uint64_t wcet, uint8_t prior
 
     // Кладем процесс в соответствующую очередь
     rt_push_to_queue(curenv);
+
+    cprintf("[DBG] now=%lu abs_deadline=%lu next_period=%lu deadline=%lu period=%lu\n",
+        now, curenv->env_rt_absolute_deadline, curenv->env_rt_next_period,
+        deadline, period);
     
-    cprintf("[RT] Process %08x registered: period=%lu, deadline=%lu, wcet=%lu, priority=%lu\n",
+    cprintf("[RT] Process %08x registered: period=%lu, deadline=%lu, wcet=%lu, priority=%u\n",
             curenv->env_id, period, deadline, wcet, priority);
     cprintf("[RT] Current time: %lu us, first deadline at %lu us\n",
         now, curenv->env_rt_absolute_deadline);
