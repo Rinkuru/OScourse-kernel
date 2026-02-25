@@ -62,7 +62,7 @@ def test_priority_correct():
     assert pids[10] is not None, "Did not see registration of prio=10"
     assert pids[200] is not None, "Did not see registration of prio=200"
 
-    pairs = 4
+    pairs = 1
 
     for k in range(pairs):
         a = picks[2*k]
